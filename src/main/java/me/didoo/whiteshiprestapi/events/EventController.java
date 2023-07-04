@@ -2,7 +2,9 @@ package me.didoo.whiteshiprestapi.events;
 
 import jakarta.validation.Valid;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.Link;
 import org.springframework.hateoas.LinkRelation;
 import org.springframework.hateoas.MediaTypes;
@@ -10,12 +12,10 @@ import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.Errors;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.Optional;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 
@@ -53,11 +53,9 @@ public class EventController {
 
         WebMvcLinkBuilder selfLinktBuilder = linkTo(EventController.class).slash("{id}");
         URI createdUri = selfLinktBuilder.toUri();
-        event.setId(1);
 
-        EventRepresentationModel eventModel = new EventRepresentationModel(event);
+        EventEntityModel eventModel = new EventEntityModel(event);
         eventModel.add(linkTo(EventController.class).withRel("query-events"));
-        eventModel.add(selfLinktBuilder.withSelfRel());
         eventModel.add(selfLinktBuilder.withRel("update-event"));
         eventModel.add(Link.of("/docs/index.html#resources-events-create", LinkRelation.of("profile")));
 
@@ -65,7 +63,25 @@ public class EventController {
     }
 
     @GetMapping
-    public ResponseEntity queryEvent(Pageable pageable){
-        return ResponseEntity.ok(this.eventRepository.findAll(pageable));
+    public ResponseEntity queryEvents(Pageable pageable, PagedResourcesAssembler<Event> pagedResourcesAssembler){
+        Page<Event> page = this.eventRepository.findAll(pageable);
+
+        var pagedResources = pagedResourcesAssembler.toModel(page, EventEntityModel::new);
+        pagedResources.add(Link.of("/docs/index.html#resources-events-list", LinkRelation.of("profile")));
+        return ResponseEntity.ok(pagedResources);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity getEvent(@PathVariable Integer id){
+        Optional<Event> optional = this.eventRepository.findById(id);
+        if(optional.isEmpty()){
+            return ResponseEntity.notFound().build();
+        }
+        Event event = optional.get();
+        EventEntityModel eventEntityModel = new EventEntityModel(event);
+        eventEntityModel.add(Link.of("/docs/index.html#resources-events-get", LinkRelation.of("profile")));
+        return ResponseEntity.ok(eventEntityModel);
+
+
     }
 }
